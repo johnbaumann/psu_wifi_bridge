@@ -124,7 +124,8 @@ void app_main(void)
 
     xTaskCreate(Task_PowerButton, "Power Button Monitor", 2048, NULL, 1, NULL);
     Init_Wifi();
-    xTaskCreate(TCP_Task_Server, "tcp_server_task", 1024 * 10, NULL, 4, NULL);
+    //xTaskCreate(TCP_Task_Server, "tcp_server_task", 1024 * 10, NULL, 4, NULL);
+    //xTaskCreate(tcp_server_task, "tcp_server", 4096, NULL, 5, NULL);
     xTaskCreate(Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 5, NULL);
 
     while (1)

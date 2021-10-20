@@ -16,170 +16,299 @@
 #include "lwip/sockets.h"
 #include "lwip/sys.h"
 #include <lwip/netdb.h>
+#include <netdb.h>
 
 #define MAX_TIMEOUT_SECONDS 10
 
-#define PORT 6699
-#define KEEPALIVE_IDLE 5
-#define KEEPALIVE_INTERVAL 5
-#define KEEPALIVE_COUNT 3
+#define ADDRESS ("0.0.0.0")
+#define PORT ("6699")
+#define INVALID_SOCK (-1)
+#define YIELD_TO_ALL_MS 50
 
-int tcp_sock;
-int listen_sock;
-char addr_str[128];
+//const size_t max_socks = CONFIG_LWIP_MAX_SOCKETS - 1;
+const size_t max_socks = 1;
+static uint8_t rx_buffer[1024];
+struct addrinfo *address_info;
+int listen_sock = INVALID_SOCK;
+static int sock[1];
+int test_sock = INVALID_SOCK;
+int flags;
 
-int keepAlive = 1;
-int keepIdle = KEEPALIVE_IDLE;
-int keepInterval = KEEPALIVE_INTERVAL;
-int keepCount = KEEPALIVE_COUNT;
-
-uint8_t rx_buffer[1024];
-
-void TCP_Cleanup()
+static void log_socket_error(const char *tag, const int sock, const int err, const char *message)
 {
-    close(listen_sock);
-    vTaskDelete(NULL);
+    ESP_LOGE(tag, "[sock=%d]: %s\n"
+                  "error=%d: %s",
+             sock, message, err, strerror(err));
 }
 
-void TCP_CloseSocket()
+static int try_receive(const char *tag, const int sock, uint8_t *data, size_t max_len)
 {
-    shutdown(tcp_sock, 0);
-    close(tcp_sock);
-    tcp_sock = 0;
+    int len = recv(sock, data, max_len, 0);
+    if (len < 0)
+    {
+        if (errno == EINPROGRESS || errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+            return 0; // Not an error
+        }
+        if (errno == ENOTCONN)
+        {
+            ESP_LOGW(tag, "[sock=%d]: Connection closed", sock);
+            return -2; // Socket has been disconnected
+        }
+        log_socket_error(tag, sock, errno, "Error occurred during receiving");
+        return -1;
+    }
+
+    return len;
 }
 
-void TCP_Init()
+static int socket_send(const char *tag, const int sock, const char *data, const size_t len)
 {
-    struct sockaddr_storage dest_addr;
-    struct sockaddr_in *dest_addr_ip4 = (struct sockaddr_in *)&dest_addr;
-    dest_addr_ip4->sin_addr.s_addr = htonl(INADDR_ANY);
-    dest_addr_ip4->sin_family = AF_INET;
-    dest_addr_ip4->sin_port = htons(PORT);
-
-    listen_sock = socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-    if (listen_sock < 0)
+    int to_write = len;
+    while (to_write > 0)
     {
-        ESP_LOGE(kLogPrefix, "Unable to create socket: errno %d", errno);
-        vTaskDelete(NULL);
-        return;
+        int written = send(sock, data + (len - to_write), to_write, 0);
+        if (written < 0 && errno != EINPROGRESS && errno != EAGAIN && errno != EWOULDBLOCK)
+        {
+            log_socket_error(tag, sock, errno, "Error occurred during sending");
+            return -1;
+        }
+        to_write -= written;
     }
-    int opt = 1;
-    setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    return len;
+}
 
-    ESP_LOGI(kLogPrefix, "Socket created");
-
-    int err = bind(listen_sock, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
-    if (err != 0)
+static inline char *get_clients_address(struct sockaddr_storage *source_addr)
+{
+    static char address_str[128];
+    char *res = NULL;
+    // Convert ip address to string
+    if (source_addr->ss_family == PF_INET)
     {
-        ESP_LOGE(kLogPrefix, "Socket unable to bind: errno %d", errno);
-        ESP_LOGE(kLogPrefix, "IPPROTO: %d", AF_INET);
-        TCP_Cleanup();
+        res = inet_ntoa_r(((struct sockaddr_in *)source_addr)->sin_addr, address_str, sizeof(address_str) - 1);
     }
-    ESP_LOGI(kLogPrefix, "Socket bound, port %d", PORT);
 
-    err = listen(listen_sock, 1);
-    if (err != 0)
+    if (!res)
     {
-        ESP_LOGE(kLogPrefix, "Error occurred during listen: errno %d", errno);
-        TCP_Cleanup();
+        address_str[0] = '\0'; // Returns empty string if conversion didn't succeed
     }
+    return address_str;
 }
 
 void TCP_SendData(int len, void *dataptr)
 {
     int to_write = len;
-    if (tcp_sock <= 0)
-        return;
-
     while (to_write > 0)
     {
-        int written = send(tcp_sock, dataptr + (len - to_write), to_write, 0);
-        if (written < 0)
+        if (test_sock == INVALID_SOCK)
         {
-            ESP_LOGE(kLogPrefix, "Error occurred during sending: errno %d", errno);
+            //log_socket_error(kLogPrefix, test_sock, errno, "INVALID_SOCK during sending");
+            return;
+        }
+
+        int written = send(test_sock, dataptr + (len - to_write), to_write, 0);
+        if (written < 0 && errno != EINPROGRESS && errno != EAGAIN && errno != EWOULDBLOCK)
+        {
+            log_socket_error(kLogPrefix, test_sock, errno, "Error occurred during sending");
+            //return -1;
+            return;
         }
         to_write -= written;
     }
+    //return len;
 }
 
-bool TCP_Retransmit()
+bool TCP_Init()
 {
-    int len;
+    struct addrinfo hints = {.ai_socktype = SOCK_STREAM};
 
-    do
+    // Prepare a list of file descriptors to hold client's sockets, mark all of them as invalid, i.e. available
+    for (int i = 0; i < max_socks; ++i)
     {
-        len = recv(tcp_sock, rx_buffer, sizeof(rx_buffer) - 1, 0);
-        if (len < 0)
-        {
-            ESP_LOGE(kLogPrefix, "Error occurred during receiving: errno %d", errno);
-        }
-        else if (len == 0)
-        {
-            ESP_LOGW(kLogPrefix, "Connection closed");
-        }
-        else
-        {
-            // send() can return less bytes than supplied length.
-            // Walk-around for robust implementation.
-            //TCP_SendData(len, rx_buffer);
-            Serial_SendData(len, rx_buffer);
+        sock[i] = INVALID_SOCK;
+        test_sock = INVALID_SOCK;
+    }
 
-            printf("PC: ");
-            for (int i = 0; i < len; i++)
-            {
-                printf("0x%2X", rx_buffer[i]);
-            }
-            printf("\n");
-        }
-    } while (len > 0);
+    // Translating the hostname or a string representation of an IP to address_info
+    int res = getaddrinfo(ADDRESS, PORT, &hints, &address_info);
+    if (res != 0 || address_info == NULL)
+    {
+        ESP_LOGE(kLogPrefix, "couldn't get hostname for `%s` "
+                             "getaddrinfo() returns %d, addrinfo=%p",
+                 ADDRESS, res, address_info);
+        return false;
+    }
+
+    // Creating a listener socket
+    listen_sock = socket(address_info->ai_family, address_info->ai_socktype, address_info->ai_protocol);
+
+    if (listen_sock < 0)
+    {
+        log_socket_error(kLogPrefix, listen_sock, errno, "Unable to create socket");
+        return false;
+    }
+    ESP_LOGI(kLogPrefix, "Listener socket created");
+
+    // Marking the socket as non-blocking
+    flags = fcntl(listen_sock, F_GETFL);
+    if (fcntl(listen_sock, F_SETFL, flags | O_NONBLOCK) == -1)
+    {
+        log_socket_error(kLogPrefix, listen_sock, errno, "Unable to set socket non blocking");
+        return false;
+    }
+    ESP_LOGI(kLogPrefix, "Socket marked as non blocking");
+
+    // Binding socket to the given address
+    int err = bind(listen_sock, address_info->ai_addr, address_info->ai_addrlen);
+    if (err != 0)
+    {
+        log_socket_error(kLogPrefix, listen_sock, errno, "Socket unable to bind");
+        return false;
+    }
+    ESP_LOGI(kLogPrefix, "Socket bound on %s:%s", ADDRESS, PORT);
+
+    // Set queue (backlog) of pending connections to one (can be more)
+    err = listen(listen_sock, 1);
+    if (err != 0)
+    {
+        log_socket_error(kLogPrefix, listen_sock, errno, "Error occurred during listen");
+        return false;
+    }
+    ESP_LOGI(kLogPrefix, "Socket listening");
 
     return true;
+}
+
+void TCP_Cleanup()
+{
+    if (listen_sock != INVALID_SOCK)
+    {
+        close(listen_sock);
+    }
+
+    for (int i = 0; i < max_socks; ++i)
+    {
+        if (sock[i] != INVALID_SOCK)
+        {
+            close(sock[i]);
+        }
+    }
+
+    free(address_info);
 }
 
 bool TCP_ProcessEvents()
 {
-    ESP_LOGI(kLogPrefix, "Socket listening");
-
     struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
     socklen_t addr_len = sizeof(source_addr);
-    tcp_sock = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
-    if (tcp_sock < 0)
+
+    // Find a free socket
+    int new_sock_index = 0;
+    for (new_sock_index = 0; new_sock_index < max_socks; ++new_sock_index)
     {
-        ESP_LOGE(kLogPrefix, "Unable to accept connection: errno %d", errno);
-        return false;
+        if (sock[new_sock_index] == INVALID_SOCK)
+        {
+            break;
+        }
     }
 
-    // Set tcp keepalive option
-    setsockopt(tcp_sock, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
-    setsockopt(tcp_sock, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
-    setsockopt(tcp_sock, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
-    setsockopt(tcp_sock, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));
-    // Convert ip address to string
-    if (source_addr.ss_family == PF_INET)
+    // We accept a new connection only if we have a free socket
+    if (new_sock_index < max_socks)
     {
-        inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
+        // Try to accept a new connections
+        sock[new_sock_index] = accept(listen_sock, (struct sockaddr *)&source_addr, &addr_len);
+
+        if (sock[new_sock_index] < 0)
+        {
+            if (errno == EWOULDBLOCK)
+            { // The listener socket did not accepts any connection
+                // continue to serve open connections and try to accept again upon the next iteration
+                ESP_LOGV(kLogPrefix, "No pending connections...");
+            }
+            else
+            {
+                log_socket_error(kLogPrefix, listen_sock, errno, "Error when accepting connection");
+                return false;
+            }
+        }
+        else
+        {
+            // We have a new client connected -> print it's address
+            ESP_LOGI(kLogPrefix, "[sock=%d]: Connection accepted from IP:%s", sock[new_sock_index], get_clients_address(&source_addr));
+            test_sock = sock[new_sock_index];
+
+            // ...and set the client's socket non-blocking
+            flags = fcntl(sock[new_sock_index], F_GETFL);
+            if (fcntl(sock[new_sock_index], F_SETFL, flags | O_NONBLOCK) == -1)
+            {
+                log_socket_error(kLogPrefix, sock[new_sock_index], errno, "Unable to set socket non blocking");
+                return false;
+            }
+            ESP_LOGI(kLogPrefix, "[sock=%d]: Socket marked as non blocking", sock[new_sock_index]);
+        }
     }
 
-    ESP_LOGI(kLogPrefix, "Socket accepted ip address: %s", addr_str);
+    // We serve all the connected clients in this loop
+    for (int i = 0; i < max_socks; ++i)
+    {
+        if (sock[i] != INVALID_SOCK)
+        {
 
-    TCP_Retransmit();
+            // This is an open socket -> try to serve it
+            int len = try_receive(kLogPrefix, sock[i], rx_buffer, sizeof(rx_buffer));
+            if (len < 0)
+            {
+                // Error occurred within this client's socket -> close and mark invalid
+                ESP_LOGI(kLogPrefix, "[sock=%d]: try_receive() returned %d -> closing the socket", sock[i], len);
+                close(sock[i]);
+                sock[i] = INVALID_SOCK;
+                test_sock = INVALID_SOCK;
+            }
+            else if (len > 0)
+            {
+                // Received some data -> echo back
+                //ESP_LOGI(kLogPrefix, "[sock=%d]: Received %.*s", sock[i], len, rx_buffer);
 
-    TCP_CloseSocket();
+                Serial_SendData(len, rx_buffer);
+
+                /*len = socket_send(kLogPrefix, sock[i], rx_buffer, len);
+                if (len < 0)
+                {
+                    // Error occurred on write to this socket -> close it and mark invalid
+                    ESP_LOGI(kLogPrefix, "[sock=%d]: socket_send() returned %d -> closing the socket", sock[i], len);
+                    close(sock[i]);
+                    sock[i] = INVALID_SOCK;
+                }
+                else
+                {
+                    // Successfully echoed to this socket
+                    ESP_LOGI(kLogPrefix, "[sock=%d]: Written %.*s", sock[i], len, rx_buffer);
+                }*/
+            }
+
+        } // one client's socket
+    }     // for all sockets
 
     return true;
 }
 
-void TCP_Task_Server(void *pvParameters)
+void tcp_server_task(void *pvParameters)
 {
-    TCP_Init();
+    if (TCP_Init() == false)
+        goto error;
 
+    // Main loop for accepting new connections and serving all connected clients
     while (1)
     {
         if (TCP_ProcessEvents() == false)
-            break;
+            goto error;
 
-        TCP_CloseSocket();            
+        // Yield to other tasks
+        vTaskDelay(pdMS_TO_TICKS(YIELD_TO_ALL_MS));
     }
-    
-    TCP_Cleanup();    
+
+error:
+    TCP_Cleanup();
+
+    vTaskDelete(NULL);
 }

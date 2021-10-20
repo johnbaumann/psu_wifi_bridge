@@ -69,10 +69,11 @@ void Serial_ProcessEvents()
         {
             TCP_SendData(len, serial_data);
 
-            printf("PSX: ");
+            //printf("PSX: ");
             for (int i = 0; i < len; i++)
             {
-                printf("0x%2X", serial_data[i]);
+                //printf("0x%2X", serial_data[i]);
+                //printf("%c", serial_data[i]);
             }
             printf("\n");
         }
@@ -80,5 +81,10 @@ void Serial_ProcessEvents()
 
 void Serial_SendData(int len, const void *dataptr)
 {
-    uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
+    for(int i=0; i < len; i++)
+    {
+        uart_write_bytes(ECHO_UART_PORT_NUM, &dataptr[i], 1);
+    }
+    
+    //uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
 }
