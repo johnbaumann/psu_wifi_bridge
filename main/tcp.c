@@ -27,7 +27,7 @@
 
 //const size_t max_socks = CONFIG_LWIP_MAX_SOCKETS - 1;
 const size_t max_socks = 1;
-static uint8_t rx_buffer[1024];
+static uint8_t rx_buffer[4096];
 struct addrinfo *address_info;
 int listen_sock = INVALID_SOCK;
 static int sock[1];
@@ -295,20 +295,19 @@ bool TCP_ProcessEvents()
 void tcp_server_task(void *pvParameters)
 {
     if (TCP_Init() == false)
-        goto error;
+        vTaskDelete(NULL);
+
+    TCP_Init();
 
     // Main loop for accepting new connections and serving all connected clients
     while (1)
     {
-        if (TCP_ProcessEvents() == false)
-            goto error;
+        TCP_ProcessEvents();
 
         // Yield to other tasks
         vTaskDelay(pdMS_TO_TICKS(YIELD_TO_ALL_MS));
     }
 
-error:
     TCP_Cleanup();
-
     vTaskDelete(NULL);
 }

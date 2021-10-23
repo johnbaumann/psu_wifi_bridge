@@ -7,6 +7,7 @@
    CONDITIONS OF ANY KIND, either express or implied.
 */
 #include "bridge.h"
+#include "file_server.h"
 #include "log.h"
 #include "serial.h"
 #include "tcp.h"
@@ -37,14 +38,14 @@ static volatile int edge_intr_times = 0;
 static volatile bool power_enabled = false;
 
 
-static void Console_Toggle_Power()
+void Console_Toggle_Power()
 {
     power_enabled = !power_enabled;
     gpio_set_level(kPin_Power, power_enabled);
     gpio_set_level(kPin_LED, power_enabled);
 }
 
-static void Console_Reset()
+void Console_Reset()
 {
     gpio_set_direction(kPin_Reset, GPIO_MODE_OUTPUT);
     gpio_set_level(kPin_Reset, 0);
@@ -124,9 +125,10 @@ void app_main(void)
 
     xTaskCreate(Task_PowerButton, "Power Button Monitor", 2048, NULL, 1, NULL);
     Init_Wifi();
-    //xTaskCreate(TCP_Task_Server, "tcp_server_task", 1024 * 10, NULL, 4, NULL);
-    //xTaskCreate(tcp_server_task, "tcp_server", 4096, NULL, 5, NULL);
+    xTaskCreate(tcp_server_task, "tcp_server", 4096, NULL, 5, NULL);
     xTaskCreate(Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 5, NULL);
+
+    ESP_ERROR_CHECK(start_file_server("/"));
 
     while (1)
     {

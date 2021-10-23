@@ -61,30 +61,18 @@ void Serial_ProcessEvents()
 {
         // Read data from the UART
         int len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE, 20 / portTICK_RATE_MS);
-        // Write data back to the UART
-
-        //Serial_SendData(len, (const char *)serial_data);
 
         if (len > 0)
         {
             TCP_SendData(len, serial_data);
-
-            //printf("PSX: ");
-            for (int i = 0; i < len; i++)
-            {
-                //printf("0x%2X", serial_data[i]);
-                //printf("%c", serial_data[i]);
-            }
-            printf("\n");
         }
 }
 
-void Serial_SendData(int len, const void *dataptr)
+void Serial_SendData(int len, uint8_t *dataptr)
 {
-    for(int i=0; i < len; i++)
+    /*for(int i=0; i < len; i++)
     {
-        uart_write_bytes(ECHO_UART_PORT_NUM, &dataptr[i], 1);
-    }
-    
-    //uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
+        //uart_write_bytes(ECHO_UART_PORT_NUM, &dataptr[i], 1);
+    }*/
+    uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
 }

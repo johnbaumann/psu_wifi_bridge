@@ -1,7 +1,9 @@
 #ifndef _SERIAL_H
 #define _SERIAL_H
 
-void Serial_SendData(int len, const void *dataptr);
+#include <stdint.h>
+
+void Serial_SendData(int len, uint8_t *dataptr);
 void Serial_Init();
 void Serial_ProcessEvents();
 
