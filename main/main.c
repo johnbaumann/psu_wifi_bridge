@@ -123,10 +123,16 @@ void app_main(void)
     gpio_set_direction(kPin_PowerButton, GPIO_MODE_INPUT);
     gpio_set_pull_mode(kPin_PowerButton, GPIO_PULLUP_ONLY);
 
+    // Monitor reset + power button status, control psu
     xTaskCreate(Task_PowerButton, "Power Button Monitor", 2048, NULL, 1, NULL);
+
+    // Init and connect to Wifi AP
     Init_Wifi();
+
+    // TCP monitor, Serial forwarder
     xTaskCreate(TCP_Task_Server, "tcp_server", 4096, NULL, 5, NULL);
-    //xTaskCreate(tcp_server_task, "tcp_server", 4096, NULL, 5, NULL);
+    
+    // This is actually just serial right now
     xTaskCreate(Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 5, NULL);
 
     ESP_ERROR_CHECK(start_file_server("/"));
