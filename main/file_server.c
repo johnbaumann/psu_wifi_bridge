@@ -10,6 +10,7 @@
 #include "file_server.h"
 
 #include "log.h"
+#include "serial.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -62,6 +63,10 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
     "<form action='/reset/'><input type='submit' value='RESET'/></form>");
         httpd_resp_sendstr_chunk(req,
     "<form action='/power/'><input type='submit' value='TOGGLE POWER'/></form>");
+        httpd_resp_sendstr_chunk(req,
+    "<form action='/fast/'><input type='submit' value='FAST'/></form>");
+        httpd_resp_sendstr_chunk(req,
+    "<form action='/slow/'><input type='submit' value='SLOW'/></form>");
 
     /* Send remaining chunk of HTML file to complete it */
     httpd_resp_sendstr_chunk(req, "</body></html>");
@@ -129,13 +134,27 @@ static esp_err_t download_get_handler(httpd_req_t *req)
     else if (strcmp(filename, "/power/") == 0)
     {
         Console_Toggle_Power();
+        Serial_Slow();
         ESP_LOGI(kLogPrefix, "Got power toggle request!\n");
         return index_html_get_handler(req);
     }
     else if (strcmp(filename, "/reset/") == 0)
     {
         Console_Reset();
+        Serial_Slow();
         ESP_LOGI(kLogPrefix, "Got reset request!\n");
+        return index_html_get_handler(req);
+    }
+    else if (strcmp(filename, "/fast/") == 0)
+    {
+        Serial_Fast();
+        ESP_LOGI(kLogPrefix, "Got fast request!\n");
+        return index_html_get_handler(req);
+    }
+    else if (strcmp(filename, "/slow/") == 0)
+    {
+        Serial_Slow();
+        ESP_LOGI(kLogPrefix, "Got slow request!\n");
         return index_html_get_handler(req);
     }
     else if (filename[strlen(filename) - 1] == '/') // If name has trailing '/', respond with directory contents
@@ -143,22 +162,6 @@ static esp_err_t download_get_handler(httpd_req_t *req)
         return http_resp_dir_html(req, filepath);
     }
 
-    return ESP_OK;
-}
-
-static esp_err_t power_post_handler(httpd_req_t *req)
-{
-    Console_Toggle_Power();
-    ESP_LOGI(kLogPrefix, "Got power toggle request!\n");
-    return index_html_get_handler(req);
-    return ESP_OK;
-}
-
-static esp_err_t reset_post_handler(httpd_req_t *req)
-{
-    Console_Reset();
-    ESP_LOGI(kLogPrefix, "Got reset request!\n");
-    return index_html_get_handler(req);
     return ESP_OK;
 }
 
