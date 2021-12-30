@@ -129,10 +129,7 @@ void app_main(void)
     // Init and connect to Wifi AP
     Init_Wifi();
 
-    // TCP monitor, Serial forwarder
-    xTaskCreate(TCP_Task_Server, "tcp_server", 4096, NULL, 5, NULL);
-    
-    // This is actually just serial right now
+    // Serial and TCP repeater
     xTaskCreate(Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 5, NULL);
 
     ESP_ERROR_CHECK(start_file_server("/"));

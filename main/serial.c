@@ -27,7 +27,7 @@
 #define ECHO_TEST_CTS (UART_PIN_NO_CHANGE)
 
 #define ECHO_UART_PORT_NUM (2)
-#define BUF_SIZE (1024*10)
+#define BUF_SIZE (1024 * 10)
 
 int uart_baud_rate = 115200;
 uint8_t serial_data[BUF_SIZE];
@@ -44,7 +44,6 @@ void Serial_Fast()
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uart_baud_rate = 510000;
     uart_set_baudrate(ECHO_UART_PORT_NUM, uart_baud_rate);
-
 }
 
 void Serial_Init()
@@ -72,24 +71,19 @@ void Serial_Init()
 
 void Serial_ProcessEvents()
 {
-        // Read data from the UART
-        int len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE, 20 / portTICK_RATE_MS);
-        // Write data back to the UART
+    // Read data from the UART
+    int len = 0;
+    // Write data back to the UART
 
-        //Serial_SendData(len, (const char *)serial_data);
+    //Serial_SendData(len, (const char *)serial_data);
 
-        if (len > 0)
-        {
-            TCP_SendData(len, serial_data);
-        }
+    while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE,  1)) > 0)
+    {
+        TCP_SendData(len, serial_data);
+    }
 }
 
 void Serial_SendData(int len, uint8_t *dataptr)
 {
-    /*for(int i=0; i < len; i++)
-    {
-        uart_write_bytes(ECHO_UART_PORT_NUM, &dataptr[i], 1);
-    }*/
-    
     uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
 }
