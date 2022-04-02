@@ -10,8 +10,8 @@
 
 bool dsr_state = false;
 bool cts_state = false;
-bool dtr_state = false;
-bool rts_state = false;
+bool dtr_state = true;
+bool rts_state = true;
 
 void Toggle_DTR()
 {

@@ -38,11 +38,11 @@ void setup_pins()
 
     gpio_reset_pin(kPin_DTR);
     gpio_set_direction(kPin_DTR, GPIO_MODE_OUTPUT);
-    gpio_set_level(kPin_DTR, kPin_DTR);
+    gpio_set_level(kPin_DTR, dtr_state);
 
     gpio_reset_pin(kPin_RTS);
     gpio_set_direction(kPin_RTS, GPIO_MODE_OUTPUT);
-    gpio_set_level(kPin_RTS, kPin_RTS);
+    gpio_set_level(kPin_RTS, rts_state);
 
     dsr_state = gpio_get_level(kPin_DSR);
     cts_state = gpio_get_level(kPin_CTS);
