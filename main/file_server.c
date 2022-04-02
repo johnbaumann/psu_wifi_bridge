@@ -11,6 +11,7 @@
 
 #include "log.h"
 #include "serial.h"
+#include "sio1.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -25,9 +26,8 @@
 #include <esp_vfs.h>
 #include <esp_http_server.h>
 
-void Console_Toggle_LidSwitch();
-void Console_Toggle_Power();
-void Console_Reset();
+void Toggle_DTR();
+void Toggle_RTS();
 
 typedef struct file_server_data
 {
@@ -55,24 +55,68 @@ static esp_err_t index_html_get_handler(httpd_req_t *req)
 static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
 {
     // Send HTML file header
-    httpd_resp_sendstr_chunk(req, "<!DOCTYPE html><html><body>");
+    httpd_resp_sendstr_chunk(req, "<!DOCTYPE html><html><style>table, th, td {border:1px solid black;}</style><body>");
 
     /* Send file-list table definition and column labels */
     httpd_resp_sendstr_chunk(req,
-                             "<h1>PS1 PSU</h1><br>");
+    "<h1>PS1 LINK THING</h1><br>");
+
     httpd_resp_sendstr_chunk(req,
-    "<form action='/reset/'><input type='submit' value='RESET'/></form>");
-        httpd_resp_sendstr_chunk(req,
-    "<form action='/power/'><input type='submit' value='TOGGLE POWER'/></form>");
-        httpd_resp_sendstr_chunk(req,
-    "<form action='/lid/'><input type='submit' value='TOGGLE LID'/></form>");
-        httpd_resp_sendstr_chunk(req,
-    "<form action='/fast/'><input type='submit' value='FAST'/></form>");
-        httpd_resp_sendstr_chunk(req,
-    "<form action='/slow/'><input type='submit' value='SLOW'/></form>");
+    "<form action='/dtr/'><input type='submit' value='Toggle DTR'/></form>");
+
+    httpd_resp_sendstr_chunk(req,
+    "<form action='/rts/'><input type='submit' value='Toggle RTS'/></form>");
+
+    httpd_resp_sendstr_chunk(req,
+    "<table style='width:100%'><tr><th>Pin</th><th>State</th></tr>");
+
+    httpd_resp_sendstr_chunk(req,
+    "<tr><td>DSR</td>");
+
+    if(gpio_get_level(kPin_DSR))
+    {
+        httpd_resp_sendstr_chunk(req, "<td>High</td></tr>");
+    }
+    else
+    {
+        httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
+    }
+
+    httpd_resp_sendstr_chunk(req,
+    "<tr><td>CTS</td>");
+    if(gpio_get_level(kPin_CTS))
+    {
+        httpd_resp_sendstr_chunk(req, "<td>High</td></tr>");
+    }
+    else
+    {
+        httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
+    }
+
+    httpd_resp_sendstr_chunk(req,
+    "<tr><td>DTR</td>");
+    if(dtr_state)
+    {
+        httpd_resp_sendstr_chunk(req, "<td>High</td></tr>");
+    }
+    else
+    {
+        httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
+    }
+    
+    httpd_resp_sendstr_chunk(req,
+    "<tr><td>RTS</td>");
+    if(rts_state)
+    {
+        httpd_resp_sendstr_chunk(req, "<td>High</td></tr>");
+    }
+    else
+    {
+        httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
+    }
 
     /* Send remaining chunk of HTML file to complete it */
-    httpd_resp_sendstr_chunk(req, "</body></html>");
+    httpd_resp_sendstr_chunk(req, "</table></body></html>");
 
     /* Send empty chunk to signal HTTP response completion */
     httpd_resp_sendstr_chunk(req, NULL);
@@ -134,38 +178,19 @@ static esp_err_t download_get_handler(httpd_req_t *req)
     {
         return index_html_get_handler(req);
     }
-    else if (strcmp(filename, "/power/") == 0)
+    else if (strcmp(filename, "/dtr/") == 0)
     {
-        Console_Toggle_Power();
-        Serial_Slow();
-        ESP_LOGI(kLogPrefix, "Got power toggle request!\n");
+        Toggle_DTR();
+        ESP_LOGI(kLogPrefix, "Got DTR toggle request!\n");
         return index_html_get_handler(req);
     }
-    else if (strcmp(filename, "/lid/") == 0)
+    else if (strcmp(filename, "/rts/") == 0)
     {
-        Console_Toggle_LidSwitch();
-        ESP_LOGI(kLogPrefix, "Got lid toggle request!\n");
+        Toggle_RTS();
+        ESP_LOGI(kLogPrefix, "Got RTS toggle request!\n");
         return index_html_get_handler(req);
     }
-    else if (strcmp(filename, "/reset/") == 0)
-    {
-        Console_Reset();
-        Serial_Slow();
-        ESP_LOGI(kLogPrefix, "Got reset request!\n");
-        return index_html_get_handler(req);
-    }
-    else if (strcmp(filename, "/fast/") == 0)
-    {
-        Serial_Fast();
-        ESP_LOGI(kLogPrefix, "Got fast request!\n");
-        return index_html_get_handler(req);
-    }
-    else if (strcmp(filename, "/slow/") == 0)
-    {
-        Serial_Slow();
-        ESP_LOGI(kLogPrefix, "Got slow request!\n");
-        return index_html_get_handler(req);
-    }
+
     else if (filename[strlen(filename) - 1] == '/') // If name has trailing '/', respond with directory contents
     {
         return http_resp_dir_html(req, filepath);
