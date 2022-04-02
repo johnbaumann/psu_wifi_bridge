@@ -33,10 +33,27 @@ const gpio_num_t kPin_Reset = GPIO_NUM_15;
 const gpio_num_t kPin_PowerButton = GPIO_NUM_4;
 const gpio_num_t kPin_LED = GPIO_NUM_2;
 const gpio_num_t kPin_Power = GPIO_NUM_5;
+const gpio_num_t kPin_LidSwitch = GPIO_NUM_18;
 
 static volatile int edge_intr_times = 0;
 static volatile bool power_enabled = false;
+static volatile bool lid_closed = false;
 
+void Console_Toggle_LidSwitch()
+{
+    lid_closed = !lid_closed;
+    if(lid_closed)
+    {
+        gpio_set_level(kPin_LidSwitch, 0);
+        gpio_set_pull_mode(kPin_LidSwitch, GPIO_PULLDOWN_ENABLE);
+        gpio_set_direction(kPin_LidSwitch, GPIO_MODE_OUTPUT);
+    }
+    else
+    {
+        gpio_set_direction(kPin_LidSwitch, GPIO_MODE_INPUT);
+        gpio_set_pull_mode(kPin_LidSwitch, GPIO_PULLDOWN_DISABLE);
+    }
+}
 
 void Console_Toggle_Power()
 {
@@ -119,6 +136,9 @@ void app_main(void)
 
     gpio_reset_pin(kPin_Reset);
     gpio_set_direction(kPin_Reset, GPIO_MODE_INPUT);
+
+    gpio_reset_pin(kPin_LidSwitch);
+    gpio_set_direction(kPin_LidSwitch, GPIO_MODE_INPUT);
 
     gpio_set_direction(kPin_PowerButton, GPIO_MODE_INPUT);
     gpio_set_pull_mode(kPin_PowerButton, GPIO_PULLUP_ONLY);

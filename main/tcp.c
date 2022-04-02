@@ -82,27 +82,7 @@ static inline char *get_clients_address(struct sockaddr_storage *source_addr)
 void TCP_SendData(int len, void *dataptr)
 {
     int to_write = len;
-    /*
-    while (to_write > 0)
-    {
-        if (test_sock == INVALID_SOCK)
-        {
-            //log_socket_error(kLogPrefix, test_sock, errno, "INVALID_SOCK during sending");
-            return;
-        }
-
-        int written = send(test_sock, dataptr + (len - to_write), 1, 0);
-        if (written < 0 && errno != EINPROGRESS && errno != EAGAIN && errno != EWOULDBLOCK)
-        {
-            log_socket_error(kLogPrefix, test_sock, errno, "Error occurred during sending");
-            //return -1;
-            return;
-        }
-        to_write -= written;
-    }
-    //return len;
-    */
-
+ 
    if (test_sock == INVALID_SOCK)
    {
        return; // Not connected

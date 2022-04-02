@@ -25,6 +25,7 @@
 #include <esp_vfs.h>
 #include <esp_http_server.h>
 
+void Console_Toggle_LidSwitch();
 void Console_Toggle_Power();
 void Console_Reset();
 
@@ -63,6 +64,8 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
     "<form action='/reset/'><input type='submit' value='RESET'/></form>");
         httpd_resp_sendstr_chunk(req,
     "<form action='/power/'><input type='submit' value='TOGGLE POWER'/></form>");
+        httpd_resp_sendstr_chunk(req,
+    "<form action='/lid/'><input type='submit' value='TOGGLE LID'/></form>");
         httpd_resp_sendstr_chunk(req,
     "<form action='/fast/'><input type='submit' value='FAST'/></form>");
         httpd_resp_sendstr_chunk(req,
@@ -136,6 +139,12 @@ static esp_err_t download_get_handler(httpd_req_t *req)
         Console_Toggle_Power();
         Serial_Slow();
         ESP_LOGI(kLogPrefix, "Got power toggle request!\n");
+        return index_html_get_handler(req);
+    }
+    else if (strcmp(filename, "/lid/") == 0)
+    {
+        Console_Toggle_LidSwitch();
+        ESP_LOGI(kLogPrefix, "Got lid toggle request!\n");
         return index_html_get_handler(req);
     }
     else if (strcmp(filename, "/reset/") == 0)
