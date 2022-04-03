@@ -1,13 +1,17 @@
-#ifndef SIO1_H
-#define SIO1_H
+#pragma once
 
-#include <driver/gpio.h>
+#include <stdint.h>
+#include <stdbool.h>
 
-#define kPin_DSR GPIO_NUM_19 // IN
-#define kPin_CTS GPIO_NUM_21 // IN
-#define kPin_DTR GPIO_NUM_5  // OUT
-#define kPin_RTS GPIO_NUM_18 // OUT
+typedef struct SIO_State
+{
+	bool data_updated;
+	uint8_t data;
+	bool dtr;
+	bool rts;
+} SIO_State;
 
+extern SIO_State send_state;
 extern bool dsr_state;
 extern bool cts_state;
 extern bool dtr_state;
@@ -15,5 +19,3 @@ extern bool rts_state;
 
 void Toggle_DTR();
 void Toggle_RTS();
-
-#endif // SIO1_H

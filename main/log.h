@@ -1,6 +1,3 @@
-#ifndef _LOG_H
-#define _LOG_H
+#pragma once
 
 extern const char *kLogPrefix;
-
-#endif // _LOG_H

@@ -1,3 +1,3 @@
 #include "log.h"
 
-const char *kLogPrefix = "esp-power-supply";
+const char *kLogPrefix = "esp-ps1-link";

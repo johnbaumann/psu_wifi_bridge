@@ -75,8 +75,6 @@ void Serial_ProcessEvents()
     int len = 0;
     // Write data back to the UART
 
-    //Serial_SendData(len, (const char *)serial_data);
-
     while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE,  1)) > 0)
     {
         TCP_SendData(len, serial_data);

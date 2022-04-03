@@ -9,6 +9,7 @@
 #include "bridge.h"
 #include "file_server.h"
 #include "log.h"
+#include "pins.h"
 #include "serial.h"
 #include "sio1.h"
 #include "tcp.h"
@@ -55,8 +56,10 @@ void app_main(void)
     // Init and connect to Wifi AP
     Init_Wifi();
 
+    Init_Bridge();
+
     // Serial and TCP repeater
-    xTaskCreate(Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 5, NULL);
+    xTaskCreate(Raw_Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 5, NULL);
 
     ESP_ERROR_CHECK(start_file_server("/"));
 

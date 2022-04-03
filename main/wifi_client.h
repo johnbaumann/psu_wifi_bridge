@@ -1,6 +1,3 @@
-#ifndef _WIFI_CLIENT_H
-#define _WIFI_CLIENT_H
+#pragma once
 
 void Init_Wifi(void);
-
-#endif // _WIFI_CLIENT_H

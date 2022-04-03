@@ -10,6 +10,7 @@
 #include "file_server.h"
 
 #include "log.h"
+#include "pins.h"
 #include "serial.h"
 #include "sio1.h"
 

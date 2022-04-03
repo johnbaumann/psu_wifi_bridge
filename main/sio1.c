@@ -1,12 +1,12 @@
 #include "sio1.h"
 
+#include "pins.h"
+
 #include <driver/gpio.h>
+
 #include <stdbool.h>
 
-//const gpio_num_t kPin_DSR = GPIO_NUM_5; // IN
-//const gpio_num_t kPin_CTS = GPIO_NUM_18; // IN
-//const gpio_num_t kPin_DTR = GPIO_NUM_19; // OUT
-//const gpio_num_t kPin_RTS = GPIO_NUM_21; // OUT
+SIO_State send_state;
 
 bool dsr_state = false;
 bool cts_state = false;
