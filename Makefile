@@ -3,6 +3,6 @@
 # project subdirectory.
 #
 
-PROJECT_NAME := psu_wifi_bridge
+PROJECT_NAME := ps1_link_thing
 
 include $(IDF_PATH)/make/project.mk

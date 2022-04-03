@@ -1,7 +1,8 @@
 #include "wifi_client.h"
 
-#include "log.h"
+#include "system/log.h"
 
+// Include order important here for some reason
 #include <string.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>

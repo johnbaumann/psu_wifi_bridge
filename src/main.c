@@ -6,26 +6,25 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
-#include "bridge.h"
-#include "file_server.h"
-#include "log.h"
-#include "pins.h"
-#include "serial.h"
-#include "sio1.h"
-#include "tcp.h"
-#include "wifi_client.h"
+#include "bridge/bridge.h"
+#include "network/file_server.h"
+#include "network/tcp.h"
+#include "network/wifi_client.h"
+#include "system/log.h"
+#include "system/pins.h"
+#include "tty/serial.h"
+#include "tty/sio1.h"
 
-#include <stdio.h>
+#include <driver/gpio.h>
+#include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <driver/gpio.h>
-#include <sdkconfig.h>
-#include <esp_log.h>
-
-#include "lwip/err.h"
-#include "lwip/sockets.h"
-#include "lwip/sys.h"
+#include <lwip/err.h>
+#include <lwip/sockets.h>
+#include <lwip/sys.h>
 #include <lwip/netdb.h>
+#include <sdkconfig.h>
+#include <stdio.h>
 
 void setup_pins()
 {

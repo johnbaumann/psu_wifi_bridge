@@ -1,13 +1,13 @@
 #include "serial.h"
 
-#include "tcp.h"
+#include "network/tcp.h"
 
+#include <driver/uart.h>
+#include <driver/gpio.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <sdkconfig.h>
 #include <stdio.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "driver/uart.h"
-#include "driver/gpio.h"
-#include "sdkconfig.h"
 
 /**
  * This is an example which echos any data it receives on configured UART back to the sender,

@@ -1,6 +1,7 @@
 #include "bridge.h"
-#include "serial.h"
-#include "tcp.h"
+
+#include "network/tcp.h"
+#include "tty/serial.h"
 
 #include <stdbool.h>
 

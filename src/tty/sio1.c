@@ -1,9 +1,8 @@
 #include "sio1.h"
 
-#include "pins.h"
+#include "system/pins.h"
 
 #include <driver/gpio.h>
-
 #include <stdbool.h>
 
 SIO_State send_state;

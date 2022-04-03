@@ -1,21 +1,20 @@
 #include "tcp.h"
 
-#include "log.h"
-#include "serial.h"
+#include "system/log.h"
+#include "tty/serial.h"
 
-#include <stdbool.h>
-#include <stdio.h>
-#include <freertos/FreeRTOS.h>
-#include <freertos/task.h>
 #include <driver/gpio.h>
 #include <esp_log.h>
-#include <sdkconfig.h>
 #include <esp_intr_alloc.h>
-
-#include "lwip/err.h"
-#include "lwip/sockets.h"
-#include "lwip/sys.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <lwip/err.h>
+#include <lwip/sockets.h>
+#include <lwip/sys.h>
 #include <lwip/netdb.h>
+#include <sdkconfig.h>
+#include <stdbool.h>
+#include <stdio.h>
 
 #define ADDRESS ("0.0.0.0")
 #define PORT ("6699")
