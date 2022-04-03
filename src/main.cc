@@ -19,12 +19,13 @@
 #include <esp_log.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <lwip/err.h>
-#include <lwip/sockets.h>
-#include <lwip/sys.h>
-#include <lwip/netdb.h>
 #include <sdkconfig.h>
 #include <stdio.h>
+
+extern "C"
+{
+    void app_main(void);
+}
 
 void setup_pins()
 {
@@ -48,7 +49,7 @@ void setup_pins()
     cts_state = gpio_get_level(kPin_CTS);
 }
 
-void app_main(void)
+void actual_main(void)
 {
     setup_pins();
 
@@ -66,4 +67,9 @@ void app_main(void)
     {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
+}
+
+void app_main(void)
+{
+    actual_main();
 }

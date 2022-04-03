@@ -49,7 +49,7 @@ static int try_receive(const char *tag, const int sock, uint8_t *data, size_t ma
             ESP_LOGW(tag, "[sock=%d]: Connection closed", sock);
             return -2; // Socket has been disconnected
         }
-        if (errno = 58)
+        if (errno == 58)
         {
             ESP_LOGW(tag, "[sock=%d]: Unknown error", sock);
             return -3; // Unknown error, connection closed non-gracefully?
