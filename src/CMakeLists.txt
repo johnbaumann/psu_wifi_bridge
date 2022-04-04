@@ -4,6 +4,7 @@ idf_component_register(
          "network/file_server.cc"
          "network/siopayload.pb.c"
          "network/tcp.cc"
+         "network/client.cc"
          "network/wifi_client.cc"
          "system/log.cc"
          "system/pins.cc"

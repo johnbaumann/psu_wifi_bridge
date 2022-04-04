@@ -6,16 +6,10 @@
 #error Regenerate this file with the current version of nanopb generator.
 #endif
 
-PB_BIND(ControlReceive, ControlReceive, AUTO)
+PB_BIND(FlowControl, FlowControl, AUTO)
 
 
-PB_BIND(ControlSend, ControlSend, AUTO)
-
-
-PB_BIND(DataReceive, DataReceive, AUTO)
-
-
-PB_BIND(DataSend, DataSend, AUTO)
+PB_BIND(DataTransfer, DataTransfer, AUTO)
 
 
 PB_BIND(SIOPayload, SIOPayload, AUTO)

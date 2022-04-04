@@ -2,3 +2,5 @@ build/
 sdkconfig.defaults
 sdkconfig.old
 .vscode/settings.json
+.DS_Store
+*.log

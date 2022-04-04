@@ -1,30 +1,17 @@
 syntax = "proto3";
 
-message ControlReceive {
-    bool dsr = 1;
-    bool cts = 2;
+message FlowControl {
+    bool dxr = 1;
+    bool xts = 2;
 }
 
-message ControlSend {
-    bool dtr = 1;
-    bool rts = 2;
-}
-
-message DataReceive {
+message DataTransfer {
     bytes data = 1;
-    uint32 length = 2;
-}
-
-message DataSend {
-    bytes data = 1;
-    uint32 length = 2;
 }
 
 message SIOPayload {
     oneof type {
-        DataReceive data_receive = 1;
-        DataSend data_send = 2;
-        ControlReceive control_receive = 3;
-        ControlSend control_send = 4;
+        DataTransfer data_transfer = 1;
+        FlowControl flow_control = 2;
     }
 }
