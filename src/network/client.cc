@@ -91,8 +91,7 @@ void tcp_client_task(void *pvParameters)
             break;
         }
         ESP_LOGI(TAG, "Successfully connected");
-        bool dtr = dtr_state;
-        bool rts = rts_state;
+
         int psx_rts = gpio_get_level(kPin_CTS);
         int psx_dtr = gpio_get_level(kPin_DSR);
 
@@ -102,6 +101,7 @@ void tcp_client_task(void *pvParameters)
             if (psx_rts != gpio_get_level(kPin_CTS) ||
                 psx_dtr != gpio_get_level(kPin_DSR))
             {
+                ESP_LOGI(TAG, "Sending a message");
                 psx_rts = gpio_get_level(kPin_CTS);
                 psx_dtr = gpio_get_level(kPin_DSR);
                 FlowControl ftcl = FlowControl_init_zero;
@@ -122,15 +122,20 @@ void tcp_client_task(void *pvParameters)
                 ESP_LOGI(TAG, "Encoding successful, data sent");
             }
 
-            // crap way to check if any data is coming in on the socket to be
-            // received... temporary
-            int count = 0;
-            ioctl(sock, FIONREAD, &count);
-            // ESP_LOGW(TAG, "count: %d", count);
-            if (count > 0)
+            // // crap way to check if any data is coming in on the socket to be
+            // // received... temporary
+            // // int count = -1;
+            // // ioctl(sock, FIONREAD, &count);
+            // // ESP_LOGW(TAG, "count: %d", count);
+            // // if (count > 0)
+            // // {
+            //     // ESP_LOGI(TAG, "Received some data...");
+            int ret1;
+            ret1 = recv(sock, NULL, 2, MSG_PEEK | MSG_DONTWAIT);
+            // ESP_LOGI(TAG, "BYTES RETURNED IS %d", ret1);
+            if (ret1 > 0) {
+                ESP_LOGI(TAG, "Inside recv..");
             {
-                ESP_LOGI(TAG, "Received some data...");
-
                 SIOPayload payload = {};
                 pb_istream_t input = pb_istream_from_socket(sock);
 
@@ -139,7 +144,7 @@ void tcp_client_task(void *pvParameters)
                     ESP_LOGE(TAG, "Decode failed: %s\n", PB_GET_ERROR(&input));
                     break;
                 }
-
+                 ESP_LOGI(TAG, "Decoding successful, message received..");
                 switch (payload.which_type)
                 {
 
@@ -148,13 +153,21 @@ void tcp_client_task(void *pvParameters)
                     break;
 
                 case SIOPayload_flow_control_tag:
-                    printf("  receive\n");
-                    printf("Setting PSX DTR to: %d\n", payload.type.flow_control.dxr);
-                    printf("Setting PSX CTS to: %d\n", payload.type.flow_control.xts);
+                    if (dtr_state != payload.type.flow_control.dxr) {
+                        printf("Setting PSX DTR to: %d\n", payload.type.flow_control.dxr);
+                        Toggle_DTR();
+                    }
+                    if (rts_state != payload.type.flow_control.xts) {
+                        printf("Setting PSX CTS to: %d\n", payload.type.flow_control.xts);
+                        Toggle_RTS();
+                    }
+                    
                     break;
+                 default: break;
                 }
             }
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            }
+            vTaskDelay(500 / portTICK_PERIOD_MS);
         }
         if (sock != -1)
         {
