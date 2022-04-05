@@ -20,8 +20,13 @@
 #include "siopayload.pb.h"
 #include "tty/sio1.h"
 
-#define HOST_IP_ADDR "10.170.241.9"
+#define HOST_IP_ADDR "10.0.0.173"
 #define HOST_PORT 3333
+
+char host_ip[] = HOST_IP_ADDR;
+int addr_family = 0;
+int ip_protocol = 0;
+int sock = -1;
 
 static const char *TAG = "Protobuf_Client";
 
@@ -60,121 +65,146 @@ pb_istream_t pb_istream_from_socket(int fd)
     return stream;
 }
 
+static bool process_inbound()
+{
+    // // crap way to check if any data is coming in on the socket to be
+    // // received... temporary
+    // // int count = -1;
+    // // ioctl(sock, FIONREAD, &count);
+    // // ESP_LOGW(TAG, "count: %d", count);
+    // // if (count > 0)
+    // // {
+    //     // ESP_LOGI(TAG, "Received some data...");
+    int ret1;
+    ret1 = recv(sock, NULL, 2, MSG_PEEK | MSG_DONTWAIT);
+    // ESP_LOGI(TAG, "BYTES RETURNED IS %d", ret1);
+    if (ret1 > 0)
+    {
+        // ESP_LOGI(TAG, "Inside recv..");
+        {
+            SIOPayload payload = {};
+            pb_istream_t input = pb_istream_from_socket(sock);
+
+            if (!pb_decode_delimited(&input, SIOPayload_fields, &payload))
+            {
+                ESP_LOGE(TAG, "Decode failed: %s\n", PB_GET_ERROR(&input));
+                return false;
+            }
+            // ESP_LOGI(TAG, "Decoding successful, message received..");
+            switch (payload.which_type)
+            {
+
+            case SIOPayload_data_transfer_tag:
+                // ESP_LOGI(TAG, "data_transfer_tag");
+                break;
+
+            case SIOPayload_flow_control_tag:
+                if (dtr_state != payload.type.flow_control.dxr)
+                {
+                    // printf("Setting PSX DTR to: %d\n", payload.type.flow_control.dxr);
+                    Toggle_DTR();
+                }
+                if (rts_state != payload.type.flow_control.xts)
+                {
+                    // printf("Setting PSX CTS to: %d\n", payload.type.flow_control.xts);
+                    Toggle_RTS();
+                }
+
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    return true;
+}
+
+static bool process_outbound()
+{
+    if (cts_state != prev_cts_state ||
+        dsr_state != prev_dsr_state)
+    {
+        // ESP_LOGI(TAG, "Sending a message");
+        prev_cts_state = cts_state;
+        prev_dsr_state = dsr_state;
+
+        FlowControl ftcl = FlowControl_init_zero;
+        ftcl.dxr = dsr_state;
+        ftcl.xts = cts_state;
+
+        SIOPayload payload = SIOPayload_init_zero;
+        pb_ostream_t output = pb_ostream_from_socket(sock);
+
+        payload.type.flow_control = ftcl;
+        payload.which_type = SIOPayload_flow_control_tag;
+
+        if (!pb_encode_delimited(&output, SIOPayload_fields, &payload))
+        {
+            ESP_LOGE(TAG, "Encoding failed: %s\n", PB_GET_ERROR(&output));
+            return false;
+        }
+        // ESP_LOGI(TAG, "Encoding successful, data sent");
+    }
+
+    return true;
+}
+
+static bool tcp_client_init()
+{
+    struct sockaddr_in dest_addr;
+    dest_addr.sin_addr.s_addr = inet_addr(host_ip);
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(HOST_PORT);
+    addr_family = AF_INET;
+    ip_protocol = IPPROTO_IP;
+
+    sock = socket(addr_family, SOCK_STREAM, ip_protocol);
+    if (sock < 0)
+    {
+        ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
+        return false;
+    }
+    ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, HOST_PORT);
+
+    int err = connect(sock, (struct sockaddr *)&dest_addr,
+                      sizeof(struct sockaddr_in6));
+    if (err != 0)
+    {
+        ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
+        return false;
+    }
+    ESP_LOGI(TAG, "Successfully connected");
+
+    return true;
+}
+
 void tcp_client_task(void *pvParameters)
 {
-    char host_ip[] = HOST_IP_ADDR;
-    int addr_family = 0;
-    int ip_protocol = 0;
 
-    while (1)
+    if (tcp_client_init())
     {
-        struct sockaddr_in dest_addr;
-        dest_addr.sin_addr.s_addr = inet_addr(host_ip);
-        dest_addr.sin_family = AF_INET;
-        dest_addr.sin_port = htons(HOST_PORT);
-        addr_family = AF_INET;
-        ip_protocol = IPPROTO_IP;
-
-        int sock = socket(addr_family, SOCK_STREAM, ip_protocol);
-        if (sock < 0)
-        {
-            ESP_LOGE(TAG, "Unable to create socket: errno %d", errno);
-            break;
-        }
-        ESP_LOGI(TAG, "Socket created, connecting to %s:%d", host_ip, HOST_PORT);
-
-        int err = connect(sock, (struct sockaddr *)&dest_addr,
-                          sizeof(struct sockaddr_in6));
-        if (err != 0)
-        {
-            ESP_LOGE(TAG, "Socket unable to connect: errno %d", errno);
-            break;
-        }
-        ESP_LOGI(TAG, "Successfully connected");
-
-        int psx_rts = gpio_get_level(kPin_CTS);
-        int psx_dtr = gpio_get_level(kPin_DSR);
-
         while (1)
         {
-
-            if (psx_rts != gpio_get_level(kPin_CTS) ||
-                psx_dtr != gpio_get_level(kPin_DSR))
+            if (!process_outbound())
             {
-                ESP_LOGI(TAG, "Sending a message");
-                psx_rts = gpio_get_level(kPin_CTS);
-                psx_dtr = gpio_get_level(kPin_DSR);
-                FlowControl ftcl = FlowControl_init_zero;
-                ftcl.dxr = psx_dtr;
-                ftcl.xts = psx_rts;
-
-                SIOPayload payload = SIOPayload_init_zero;
-                pb_ostream_t output = pb_ostream_from_socket(sock);
-
-                payload.type.flow_control = ftcl;
-                payload.which_type = SIOPayload_flow_control_tag;
-
-                if (!pb_encode_delimited(&output, SIOPayload_fields, &payload))
-                {
-                    ESP_LOGE(TAG, "Encoding failed: %s\n", PB_GET_ERROR(&output));
-                    break;
-                }
-                ESP_LOGI(TAG, "Encoding successful, data sent");
+                ESP_LOGE(TAG, "process_outbound failed");
+                break;
             }
 
-            // // crap way to check if any data is coming in on the socket to be
-            // // received... temporary
-            // // int count = -1;
-            // // ioctl(sock, FIONREAD, &count);
-            // // ESP_LOGW(TAG, "count: %d", count);
-            // // if (count > 0)
-            // // {
-            //     // ESP_LOGI(TAG, "Received some data...");
-            int ret1;
-            ret1 = recv(sock, NULL, 2, MSG_PEEK | MSG_DONTWAIT);
-            // ESP_LOGI(TAG, "BYTES RETURNED IS %d", ret1);
-            if (ret1 > 0) {
-                ESP_LOGI(TAG, "Inside recv..");
+            if (!process_inbound())
             {
-                SIOPayload payload = {};
-                pb_istream_t input = pb_istream_from_socket(sock);
-
-                if (!pb_decode_delimited(&input, SIOPayload_fields, &payload))
-                {
-                    ESP_LOGE(TAG, "Decode failed: %s\n", PB_GET_ERROR(&input));
-                    break;
-                }
-                 ESP_LOGI(TAG, "Decoding successful, message received..");
-                switch (payload.which_type)
-                {
-
-                case SIOPayload_data_transfer_tag:
-                    ESP_LOGI(TAG, "data_transfer_tag");
-                    break;
-
-                case SIOPayload_flow_control_tag:
-                    if (dtr_state != payload.type.flow_control.dxr) {
-                        printf("Setting PSX DTR to: %d\n", payload.type.flow_control.dxr);
-                        Toggle_DTR();
-                    }
-                    if (rts_state != payload.type.flow_control.xts) {
-                        printf("Setting PSX CTS to: %d\n", payload.type.flow_control.xts);
-                        Toggle_RTS();
-                    }
-                    
-                    break;
-                 default: break;
-                }
+                ESP_LOGE(TAG, "process_inbound failed");
+                break;
             }
-            }
-            vTaskDelay(500 / portTICK_PERIOD_MS);
         }
-        if (sock != -1)
-        {
-            ESP_LOGE(TAG, "Shutting down socket and restarting...");
-            shutdown(sock, 0);
-            close(sock);
-        }
+    }
+    ESP_LOGE(TAG, "TCP client task ended");
+    if (sock != -1)
+    {
+         ESP_LOGE(TAG, "Shutting down socket...");
+        shutdown(sock, 0);
+        close(sock);
     }
     vTaskDelete(NULL);
 }
