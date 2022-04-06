@@ -13,7 +13,8 @@
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/param.h>
-
+#include <driver/uart.h>
+#include "file_server.h"
 #include "client.h"
 #include "nanopb/pb_decode.h"
 #include "nanopb/pb_encode.h"
@@ -23,10 +24,14 @@
 #define HOST_IP_ADDR "10.0.0.173"
 #define HOST_PORT 3333
 
+#define ECHO_UART_PORT_NUM (2)
+#define BUFSIZE (1024)
+
 char host_ip[] = HOST_IP_ADDR;
 int addr_family = 0;
 int ip_protocol = 0;
 int sock = -1;
+uint8_t serbuf[BUFSIZE];
 
 static const char *TAG = "Protobuf_Client";
 
@@ -65,16 +70,18 @@ pb_istream_t pb_istream_from_socket(int fd)
     return stream;
 }
 
+static bool encode_bytes(pb_ostream_t *stream, const pb_field_t *field,
+                   void *const *arg) {
+
+    mydata_t *mydata = (mydata_t*)*arg;
+  if (!pb_encode_tag_for_field(stream, field))
+    return false;
+
+  return pb_encode_string(stream, mydata->buf, mydata->len);
+}
+
 static bool process_inbound()
 {
-    // // crap way to check if any data is coming in on the socket to be
-    // // received... temporary
-    // // int count = -1;
-    // // ioctl(sock, FIONREAD, &count);
-    // // ESP_LOGW(TAG, "count: %d", count);
-    // // if (count > 0)
-    // // {
-    //     // ESP_LOGI(TAG, "Received some data...");
     int ret1;
     ret1 = recv(sock, NULL, 2, MSG_PEEK | MSG_DONTWAIT);
     // ESP_LOGI(TAG, "BYTES RETURNED IS %d", ret1);
@@ -122,30 +129,45 @@ static bool process_inbound()
 
 static bool process_outbound()
 {
+    // Flow Control Messages 
     if (cts_state != prev_cts_state ||
-        dsr_state != prev_dsr_state)
-    {
-        // ESP_LOGI(TAG, "Sending a message");
+        dsr_state != prev_dsr_state) {
         prev_cts_state = cts_state;
         prev_dsr_state = dsr_state;
 
-        FlowControl ftcl = FlowControl_init_zero;
-        ftcl.dxr = dsr_state;
-        ftcl.xts = cts_state;
-
         SIOPayload payload = SIOPayload_init_zero;
-        pb_ostream_t output = pb_ostream_from_socket(sock);
-
-        payload.type.flow_control = ftcl;
         payload.which_type = SIOPayload_flow_control_tag;
-
+        payload.type.flow_control.dxr = dsr_state;
+        payload.type.flow_control.xts = cts_state;
+        pb_ostream_t output = pb_ostream_from_socket(sock);
+        
         if (!pb_encode_delimited(&output, SIOPayload_fields, &payload))
         {
             ESP_LOGE(TAG, "Encoding failed: %s\n", PB_GET_ERROR(&output));
             return false;
         }
-        // ESP_LOGI(TAG, "Encoding successful, data sent");
+        ESP_LOGI(TAG, "Encoding flow control message successful, data sent");
     }
+
+    // Data Transfer Messages
+    size_t len = 0;
+    ESP_ERROR_CHECK(uart_get_buffered_data_len(ECHO_UART_PORT_NUM, (size_t*)&len));
+    if (len > 0 && disable_uploads) {
+        uart_read_bytes(ECHO_UART_PORT_NUM, serbuf, len, 1);
+        mydata_t mydata = {len, serbuf};
+        SIOPayload payload = SIOPayload_init_zero;
+        payload.which_type = SIOPayload_data_transfer_tag;
+        payload.type.data_transfer.data.funcs.encode = encode_bytes;
+        payload.type.data_transfer.data.arg = &mydata;
+        pb_ostream_t output = pb_ostream_from_socket(sock);
+        if (!pb_encode_delimited(&output, SIOPayload_fields, &payload)) {
+            ESP_LOGE(TAG, "Encoding bytes failed: %s\n", PB_GET_ERROR(&output));
+            return false;
+        }
+        // uart_write_bytes(ECHO_UART_PORT_NUM, serbuf, len);
+        ESP_LOGI(TAG, "Encoding data message successful, sent with length of: %d", len);
+    }
+    
 
     return true;
 }
@@ -191,12 +213,11 @@ void tcp_client_task(void *pvParameters)
                 ESP_LOGE(TAG, "process_outbound failed");
                 break;
             }
-
-            if (!process_inbound())
-            {
-                ESP_LOGE(TAG, "process_inbound failed");
-                break;
-            }
+            // if (!process_inbound())
+            // {
+            //     ESP_LOGE(TAG, "process_inbound failed");
+            //     break;
+            // }
         }
     }
     ESP_LOGE(TAG, "TCP client task ended");

@@ -21,6 +21,7 @@
 #include <string.h>
 #include <sys/param.h>
 
+bool disable_uploads = true;
 
 void Toggle_DTR();
 void Toggle_RTS();
@@ -62,6 +63,9 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
 
     httpd_resp_sendstr_chunk(req,
     "<form action='/rts/'><input type='submit' value='Toggle RTS'/></form>");
+
+    httpd_resp_sendstr_chunk(req,
+    "<form action='/upload/'><input type='submit' value='Toggle Uploading'/></form>");
 
     httpd_resp_sendstr_chunk(req,
     "<table style='width:100%'><tr><th>Pin</th><th>State</th></tr>");
@@ -109,6 +113,13 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
     else
     {
         httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
+    }
+    httpd_resp_sendstr_chunk(req,
+    "<tr><td>Upload</td>");
+    if (disable_uploads) {
+         httpd_resp_sendstr_chunk(req, "<td>Disabled</td></tr>");
+    } else {
+        httpd_resp_sendstr_chunk(req, "<td>Enabled</td></tr>");
     }
 
     /* Send remaining chunk of HTML file to complete it */
@@ -184,6 +195,12 @@ static esp_err_t download_get_handler(httpd_req_t *req)
     {
         Toggle_RTS();
         ESP_LOGI(kLogPrefix, "Got RTS toggle request!\n");
+        return index_html_get_handler(req);
+    } 
+    else if (strcmp(filename, "/upload/") == 0)
+    {
+        disable_uploads = !disable_uploads;
+        ESP_LOGI(kLogPrefix, "Uploading toggled!\n");
         return index_html_get_handler(req);
     }
 

@@ -8,7 +8,7 @@
 #include <freertos/task.h>
 #include <sdkconfig.h>
 #include <stdio.h>
-
+#include "network/file_server.h"
 /**
  * This is an example which echos any data it receives on configured UART back to the sender,
  * with hardware flow control turned off. It does not use UART driver event queue.
@@ -71,17 +71,21 @@ void Serial_Init()
 
 void Serial_ProcessEvents()
 {
-    // Read data from the UART
-    int len = 0;
-    // Write data back to the UART
+    if (!disable_uploads) {
+        // Read data from the UART
+        int len = 0;
+        // Write data back to the UART
 
-    while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE,  1)) > 0)
-    {
-        TCP_SendData(len, serial_data);
+        while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE,  1)) > 0)
+        {
+            TCP_SendData(len, serial_data);
+        }
     }
 }
 
 void Serial_SendData(int len, uint8_t *dataptr)
 {
-    uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
+    if (!disable_uploads) {
+        uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
+    }
 }
