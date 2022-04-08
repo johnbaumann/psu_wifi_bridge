@@ -14,12 +14,15 @@
 #include "tty/sio1.h"
 #include "system/pins.h"
 
+#include <driver/uart.h>
 #include <esp_err.h>
 #include <esp_log.h>
 #include <esp_http_server.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/param.h>
+
+#define ECHO_UART_PORT_NUM (2)
 
 bool disable_uploads = true;
 
@@ -51,79 +54,128 @@ static esp_err_t index_html_get_handler(httpd_req_t *req)
 // string other than '/', since SPIFFS doesn't support directories
 static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
 {
-    // Send HTML file header
-    httpd_resp_sendstr_chunk(req, "<!DOCTYPE html><html><style>table, th, td {border:1px solid black;}</style><body>");
+    char buffer[32];
 
-    /* Send file-list table definition and column labels */
+    // Send HTML chunk
     httpd_resp_sendstr_chunk(req,
-    "<h1>PS1 LINK THING</h1><br>");
+                             "<!DOCTYPE html>"
+                             "<html>"
+                             "  <style>table, th, td {border:1px solid black;}</style>"
+                             "  <body>"
+                             "      <h1>PS1 LINK THING</h1>"
+                             "      <table>"
+                             "          <tr><th></th><th>Pin</th><th>State</th></tr>");
 
-    httpd_resp_sendstr_chunk(req,
-    "<form action='/dtr/'><input type='submit' value='Toggle DTR'/></form>");
-
-    httpd_resp_sendstr_chunk(req,
-    "<form action='/rts/'><input type='submit' value='Toggle RTS'/></form>");
-
-    httpd_resp_sendstr_chunk(req,
-    "<form action='/upload/'><input type='submit' value='Toggle Uploading'/></form>");
-
-    httpd_resp_sendstr_chunk(req,
-    "<table style='width:100%'><tr><th>Pin</th><th>State</th></tr>");
-
-    httpd_resp_sendstr_chunk(req,
-    "<tr><td>DSR</td>");
-
-    if(gpio_get_level(kPin_DSR))
+    // Send DSR
+    httpd_resp_sendstr_chunk(req, "<tr><td></td><td>DSR</td><td>");
+    if (gpio_get_level(kPin_DSR))
     {
-        httpd_resp_sendstr_chunk(req, "<td>High</td></tr>");
+        httpd_resp_sendstr_chunk(req, "High</td></tr>");
     }
     else
     {
-        httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
+        httpd_resp_sendstr_chunk(req, "Low</td></tr>");
     }
 
-    httpd_resp_sendstr_chunk(req,
-    "<tr><td>CTS</td>");
-    if(gpio_get_level(kPin_CTS))
+    // Send CTS
+    httpd_resp_sendstr_chunk(req, "<tr><td></td><td>CTS</td><td>");
+    if (gpio_get_level(kPin_CTS))
     {
-        httpd_resp_sendstr_chunk(req, "<td>High</td></tr>");
+        httpd_resp_sendstr_chunk(req, "High</td></tr>");
     }
     else
     {
-        httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
+        httpd_resp_sendstr_chunk(req, "Low</td></tr>");
     }
 
-    httpd_resp_sendstr_chunk(req,
-    "<tr><td>DTR</td>");
-    if(dtr_state)
+    // Send DTR
+    httpd_resp_sendstr_chunk(req, "<tr><td><form action='/dtr/'><input type='submit' value='Toggle'/></form></td><td>DTR</td><td>");
+    if (dtr_state)
     {
-        httpd_resp_sendstr_chunk(req, "<td>High</td></tr>");
+        httpd_resp_sendstr_chunk(req, "High</td></tr>");
     }
     else
     {
-        httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
+        httpd_resp_sendstr_chunk(req, "Low</td></tr>");
     }
-    
-    httpd_resp_sendstr_chunk(req,
-    "<tr><td>RTS</td>");
-    if(rts_state)
+
+    // Send RTS
+    httpd_resp_sendstr_chunk(req, "<tr><td><form action='/rts/'><input type='submit' value='Toggle'/></form></td><td>RTS</td><td>");
+    if (rts_state)
     {
-        httpd_resp_sendstr_chunk(req, "<td>High</td></tr>");
+        httpd_resp_sendstr_chunk(req, "High</td></tr>");
     }
     else
     {
-        httpd_resp_sendstr_chunk(req, "<td>Low</td></tr>");
-    }
-    httpd_resp_sendstr_chunk(req,
-    "<tr><td>Upload</td>");
-    if (disable_uploads) {
-         httpd_resp_sendstr_chunk(req, "<td>Disabled</td></tr>");
-    } else {
-        httpd_resp_sendstr_chunk(req, "<td>Enabled</td></tr>");
+        httpd_resp_sendstr_chunk(req, "Low</td></tr>");
     }
 
-    /* Send remaining chunk of HTML file to complete it */
-    httpd_resp_sendstr_chunk(req, "</table></body></html>");
+    // Upload status
+    httpd_resp_sendstr_chunk(req, "<tr><td><form action='/upload/'><input type='submit' value='Toggle'/></form></td><td>Upload</td><td>");
+    if (disable_uploads)
+    {
+        httpd_resp_sendstr_chunk(req, "Disabled");
+    }
+    else
+    {
+        httpd_resp_sendstr_chunk(req, "Enabled");
+    }
+
+    // UUART Settings
+    httpd_resp_sendstr_chunk(req,
+                             "          </td></tr>"
+                             "      </table><br><br>"
+                             "      <b>UART Settings</b>"
+                             "      <form action='/'>"
+                             "          <table>"
+                             "              <tr><th>Setting</th><th>Value</th></tr>"
+                             "              <tr><td>Baud</td><td><input type='number' id='baud' name='baud' min='1' max='2000000' value='");
+
+    // Send baud rate
+    sprintf(buffer, "%i", uart_config.baud_rate);
+    httpd_resp_sendstr_chunk(req, buffer);
+    httpd_resp_sendstr_chunk(req, "'></td></tr>"
+                                  "              <tr><td>Parity</td><td><select name='parity' id='parity' ");
+
+    if (uart_config.parity == UART_PARITY_DISABLE)
+        httpd_resp_sendstr_chunk(req, "selected");
+
+    httpd_resp_sendstr_chunk(req,
+                             "><option value='disable'>Disable</option><option value='even' ");
+
+    if (uart_config.parity == UART_PARITY_EVEN)
+        httpd_resp_sendstr_chunk(req, "selected");
+
+    httpd_resp_sendstr_chunk(req,
+                             ">Even</option><option value='odd'");
+
+    if (uart_config.parity == UART_PARITY_ODD)
+        httpd_resp_sendstr_chunk(req, "selected");
+
+    httpd_resp_sendstr_chunk(req,
+                             ">Odd</option></select></td></tr>"
+                             "              <tr><td>Stop bits</td><td><select name='stop_bits' id='stop_bits'><option value='1' ");
+
+    if (uart_config.stop_bits == UART_STOP_BITS_1)
+        httpd_resp_sendstr_chunk(req, "selected");
+
+    httpd_resp_sendstr_chunk(req, ">1</option><option value='1.5' ");
+
+    if (uart_config.stop_bits == UART_STOP_BITS_1_5)
+        httpd_resp_sendstr_chunk(req, "selected");
+
+    httpd_resp_sendstr_chunk(req, ">1.5</option><option value='2' ");
+
+    if (uart_config.stop_bits == UART_STOP_BITS_2)
+        httpd_resp_sendstr_chunk(req, "selected");
+
+    httpd_resp_sendstr_chunk(req,
+                             ">2</option></select></td></tr>"
+                             "          </table>"
+                             "          <input type='submit' value='Set'/>"
+                             "      </form>"
+                             "  </body>"
+                             "</html>");
 
     /* Send empty chunk to signal HTTP response completion */
     httpd_resp_sendstr_chunk(req, NULL);
@@ -170,6 +222,11 @@ static const char *get_path_from_uri(char *dest, const char *base_path, const ch
 static esp_err_t download_get_handler(httpd_req_t *req)
 {
     char filepath[1024];
+    unsigned long new_baud;
+
+    char *buf;
+    char param[32];
+    int buf_len;
 
     const char *filename = get_path_from_uri(filepath, ((file_server_data *)req->user_ctx)->base_path,
                                              req->uri, sizeof(filepath));
@@ -179,6 +236,97 @@ static esp_err_t download_get_handler(httpd_req_t *req)
         /* Respond with 500 Internal Server Error */
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Filename too long");
         return ESP_FAIL;
+    }
+
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+
+    if (buf_len > 1)
+    {
+        buf = (char *)malloc(buf_len);
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK)
+        {
+            ESP_LOGI(kLogPrefix, "Found URL query => %s", buf);
+
+            /* Get value of expected key from query string */
+            if (httpd_query_key_value(buf, "baud", param, sizeof(param)) == ESP_OK)
+            {
+                ESP_LOGI(kLogPrefix, "Found URL query parameter => baud=%s", param);
+                new_baud = strtoul(param, NULL, 0);
+
+                if (new_baud > 0)
+                {
+                    // Set new baud rate
+                    ESP_LOGI(kLogPrefix, "Setting baud rate to %li", new_baud);
+                    uart_config.baud_rate = new_baud;
+                }
+                else
+                {
+                    ESP_LOGE(kLogPrefix, "Invalid baud : %s", param);
+                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid baud parameter");
+                    return ESP_FAIL;
+                }
+            }
+            
+            if (httpd_query_key_value(buf, "parity", param, sizeof(param)) == ESP_OK)
+            {
+                if(strcmp(param, "disable") == 0)
+                {
+                    ESP_LOGI(kLogPrefix, "Setting parity to disable");
+                    uart_config.parity = UART_PARITY_DISABLE;
+                }
+                else if(strcmp(param, "even") == 0)
+                {
+                    ESP_LOGI(kLogPrefix, "Setting parity to even");
+                    uart_config.parity = UART_PARITY_EVEN;
+                }
+                else if(strcmp(param, "odd") == 0)
+                {
+                    ESP_LOGI(kLogPrefix, "Setting parity to odd");
+                    uart_config.parity = UART_PARITY_ODD;
+                }
+                else
+                {
+                    ESP_LOGE(kLogPrefix, "Invalid parity : %s", param);
+                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid parity parameter");
+                    return ESP_FAIL;
+                }
+            }
+            
+            if (httpd_query_key_value(buf, "stop_bits", param, sizeof(param)) == ESP_OK)
+            {
+                if(strcmp(param, "1") == 0)
+                {
+                    ESP_LOGI(kLogPrefix, "Setting stop bits to 1");
+                    uart_config.stop_bits = UART_STOP_BITS_1;
+                }
+                else if(strcmp(param, "1.5") == 0)
+                {
+                    ESP_LOGI(kLogPrefix, "Setting stop bits to 1.5");
+                    uart_config.stop_bits = UART_STOP_BITS_1_5;
+                }
+                else if(strcmp(param, "2") == 0)
+                {
+                    ESP_LOGI(kLogPrefix, "Setting stop bits to 2");
+                    uart_config.stop_bits = UART_STOP_BITS_2;
+                }
+                else
+                {
+                    ESP_LOGE(kLogPrefix, "Invalid stop bits : %s", param);
+                    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid stop bits parameter");
+                    return ESP_FAIL;
+                }
+            }
+            else
+            {
+                ESP_LOGE(kLogPrefix, "Invalid parameter : %s", param);
+                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Invalid parameter");
+                return ESP_FAIL;
+            }
+        }
+        ESP_ERROR_CHECK(uart_param_config(ECHO_UART_PORT_NUM, &uart_config));
+
+        free(buf);
+        return index_html_get_handler(req);
     }
 
     if (strcmp(filename, "/index.html") == 0)
@@ -196,7 +344,7 @@ static esp_err_t download_get_handler(httpd_req_t *req)
         Toggle_RTS();
         ESP_LOGI(kLogPrefix, "Got RTS toggle request!\n");
         return index_html_get_handler(req);
-    } 
+    }
     else if (strcmp(filename, "/upload/") == 0)
     {
         disable_uploads = !disable_uploads;

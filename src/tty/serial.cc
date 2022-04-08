@@ -32,6 +32,8 @@
 int uart_baud_rate = 115200;
 uint8_t serial_data[BUF_SIZE];
 
+uart_config_t uart_config;
+
 void Serial_Slow()
 {
     uart_baud_rate = 115200;
@@ -50,14 +52,13 @@ void Serial_Init()
 {
     // Configure parameters of an UART driver,
     // communication pins and install the driver
-    uart_config_t uart_config = {
-        .baud_rate = uart_baud_rate,
-        .data_bits = UART_DATA_8_BITS,
-        .parity = UART_PARITY_DISABLE,
-        .stop_bits = UART_STOP_BITS_2,
-        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_APB,
-    };
+    uart_config.baud_rate = uart_baud_rate;
+    uart_config.data_bits = UART_DATA_8_BITS;
+    uart_config.parity = UART_PARITY_DISABLE;
+    uart_config.stop_bits = UART_STOP_BITS_2;
+    uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
+    uart_config.source_clk = UART_SCLK_APB;
+
     int intr_alloc_flags = 0;
 
 #if CONFIG_UART_ISR_IN_IRAM
@@ -71,12 +72,13 @@ void Serial_Init()
 
 void Serial_ProcessEvents()
 {
-    if (!disable_uploads) {
+    if (!disable_uploads)
+    {
         // Read data from the UART
         int len = 0;
         // Write data back to the UART
 
-        while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE,  1)) > 0)
+        while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE, 1)) > 0)
         {
             TCP_SendData(len, serial_data);
         }
@@ -85,7 +87,8 @@ void Serial_ProcessEvents()
 
 void Serial_SendData(int len, uint8_t *dataptr)
 {
-    if (!disable_uploads) {
+    if (!disable_uploads)
+    {
         uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
     }
 }
