@@ -10,7 +10,6 @@ message DataTransfer {
 }
 
 message SIOPayload {
-    option (nanopb_msgopt).submsg_callback = true;
     oneof type {
         DataTransfer data_transfer = 1;
         FlowControl flow_control = 2;

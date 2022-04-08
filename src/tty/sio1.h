@@ -23,3 +23,5 @@ extern bool prev_dsr_state;
 void Flow_InterruptHandler(void *arg);
 void Toggle_DTR();
 void Toggle_RTS();
+void Set_DTR(bool value);
+void Set_RTS(bool value);
