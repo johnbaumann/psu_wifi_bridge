@@ -9,6 +9,7 @@
 
 #include "file_server.h"
 
+#include "bridge/bridge.h"
 #include "system/log.h"
 #include "tty/serial.h"
 #include "tty/sio1.h"
@@ -23,8 +24,6 @@
 #include <sys/param.h>
 
 #define ECHO_UART_PORT_NUM (2)
-
-bool disable_uploads = true;
 
 void Toggle_DTR();
 void Toggle_RTS();

@@ -72,23 +72,18 @@ void Serial_Init()
 
 void Serial_ProcessEvents()
 {
-    if (!disable_uploads)
-    {
-        // Read data from the UART
-        int len = 0;
-        // Write data back to the UART
 
-        while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE, 1)) > 0)
-        {
-            TCP_SendData(len, serial_data);
-        }
+    // Read data from the UART
+    int len = 0;
+    // Write data back to the UART
+
+    while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE, 1)) > 0)
+    {
+        TCP_SendData(len, serial_data);
     }
 }
 
 void Serial_SendData(int len, uint8_t *dataptr)
 {
-    if (!disable_uploads)
-    {
-        uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
-    }
+    uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
 }

@@ -66,7 +66,7 @@ void actual_main(void)
     Init_Bridge();
 
     // Serial and TCP repeater
-    xTaskCreate(Raw_Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 0, NULL);
+    xTaskCreate(Raw_Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 1, NULL);
 
     // TCP Client Task for Protobuf
     xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 0, NULL);

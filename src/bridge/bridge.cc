@@ -5,6 +5,8 @@
 
 #include <stdbool.h>
 
+volatile bool disable_uploads = true;
+
 void Init_Bridge()
 {
     Serial_Init();
@@ -15,13 +17,19 @@ void Protocol_Bridge_Task_Server(void *pvParameters)
 {
     while (1)
     {
-        Serial_ProcessEvents();
-        TCP_ProcessEvents();
+        if (!disable_uploads)
+        {
+            Serial_ProcessEvents();
+            TCP_ProcessEvents();
+        }
+        else
+        {
+            vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
     }
 
     TCP_Cleanup();
 }
-
 
 void Raw_Bridge_Task_Server(void *pvParameters)
 {
@@ -33,4 +41,3 @@ void Raw_Bridge_Task_Server(void *pvParameters)
 
     TCP_Cleanup();
 }
-

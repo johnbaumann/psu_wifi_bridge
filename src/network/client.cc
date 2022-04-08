@@ -20,6 +20,7 @@
 #include "nanopb/pb_encode.h"
 #include "siopayload.pb.h"
 #include "tty/sio1.h"
+#include "bridge/bridge.h"
 
 #define HOST_IP_ADDR "10.0.0.173"
 #define HOST_PORT 3333
@@ -71,13 +72,14 @@ pb_istream_t pb_istream_from_socket(int fd)
 }
 
 static bool encode_bytes(pb_ostream_t *stream, const pb_field_t *field,
-                   void *const *arg) {
+                         void *const *arg)
+{
 
-    mydata_t *mydata = (mydata_t*)*arg;
-  if (!pb_encode_tag_for_field(stream, field))
-    return false;
+    mydata_t *mydata = (mydata_t *)*arg;
+    if (!pb_encode_tag_for_field(stream, field))
+        return false;
 
-  return pb_encode_string(stream, mydata->buf, mydata->len);
+    return pb_encode_string(stream, mydata->buf, mydata->len);
 }
 
 static bool process_inbound()
@@ -129,9 +131,10 @@ static bool process_inbound()
 
 static bool process_outbound()
 {
-    // Flow Control Messages 
+    // Flow Control Messages
     if (cts_state != prev_cts_state ||
-        dsr_state != prev_dsr_state) {
+        dsr_state != prev_dsr_state)
+    {
         prev_cts_state = cts_state;
         prev_dsr_state = dsr_state;
 
@@ -140,7 +143,7 @@ static bool process_outbound()
         payload.type.flow_control.dxr = dsr_state;
         payload.type.flow_control.xts = cts_state;
         pb_ostream_t output = pb_ostream_from_socket(sock);
-        
+
         if (!pb_encode_delimited(&output, SIOPayload_fields, &payload))
         {
             ESP_LOGE(TAG, "Encoding failed: %s\n", PB_GET_ERROR(&output));
@@ -151,8 +154,9 @@ static bool process_outbound()
 
     // Data Transfer Messages
     size_t len = 0;
-    ESP_ERROR_CHECK(uart_get_buffered_data_len(ECHO_UART_PORT_NUM, (size_t*)&len));
-    if (len > 0 && disable_uploads) {
+    ESP_ERROR_CHECK(uart_get_buffered_data_len(ECHO_UART_PORT_NUM, (size_t *)&len));
+    if (len > 0 && disable_uploads)
+    {
         uart_read_bytes(ECHO_UART_PORT_NUM, serbuf, len, 1);
         mydata_t mydata = {len, serbuf};
         SIOPayload payload = SIOPayload_init_zero;
@@ -160,14 +164,14 @@ static bool process_outbound()
         payload.type.data_transfer.data.funcs.encode = encode_bytes;
         payload.type.data_transfer.data.arg = &mydata;
         pb_ostream_t output = pb_ostream_from_socket(sock);
-        if (!pb_encode_delimited(&output, SIOPayload_fields, &payload)) {
+        if (!pb_encode_delimited(&output, SIOPayload_fields, &payload))
+        {
             ESP_LOGE(TAG, "Encoding bytes failed: %s\n", PB_GET_ERROR(&output));
             return false;
         }
         // uart_write_bytes(ECHO_UART_PORT_NUM, serbuf, len);
         ESP_LOGI(TAG, "Encoding data message successful, sent with length of: %d", len);
     }
-    
 
     return true;
 }
@@ -208,22 +212,29 @@ void tcp_client_task(void *pvParameters)
     {
         while (1)
         {
-            if (!process_outbound())
+            if (disable_uploads)
             {
-                ESP_LOGE(TAG, "process_outbound failed");
-                break;
+                if (!process_outbound())
+                {
+                    ESP_LOGE(TAG, "process_outbound failed");
+                    break;
+                }
+                // if (!process_inbound())
+                // {
+                //     ESP_LOGE(TAG, "process_inbound failed");
+                //     break;
+                // }
             }
-            // if (!process_inbound())
-            // {
-            //     ESP_LOGE(TAG, "process_inbound failed");
-            //     break;
-            // }
+            else
+            {
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+            }
         }
     }
     ESP_LOGE(TAG, "TCP client task ended");
     if (sock != -1)
     {
-         ESP_LOGE(TAG, "Shutting down socket...");
+        ESP_LOGE(TAG, "Shutting down socket...");
         shutdown(sock, 0);
         close(sock);
     }
