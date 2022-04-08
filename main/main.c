@@ -150,7 +150,7 @@ void app_main(void)
     Init_Wifi();
 
     // Serial and TCP repeater
-    xTaskCreate(Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 5, NULL);
+    xTaskCreate(Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 1, NULL);
 
     ESP_ERROR_CHECK(start_file_server("/"));
 

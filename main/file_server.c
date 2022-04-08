@@ -24,6 +24,9 @@
 
 #include <esp_vfs.h>
 #include <esp_http_server.h>
+#include <driver/uart.h>
+
+#define ECHO_UART_PORT_NUM (2)
 
 void Console_Toggle_LidSwitch();
 void Console_Toggle_Power();
@@ -61,15 +64,29 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
     httpd_resp_sendstr_chunk(req,
                              "<h1>PS1 PSU</h1><br>");
     httpd_resp_sendstr_chunk(req,
-    "<form action='/reset/'><input type='submit' value='RESET'/></form>");
+                             "<form action='/reset/'><input type='submit' value='RESET'/></form>");
+    httpd_resp_sendstr_chunk(req,
+                             "<form action='/power/'><input type='submit' value='TOGGLE POWER'/></form>");
+    httpd_resp_sendstr_chunk(req,
+                             "<form action='/lid/'><input type='submit' value='TOGGLE LID'/></form>");
+    httpd_resp_sendstr_chunk(req,
+                             "<form action='/fast/'><input type='submit' value='FAST'/></form>");
+    httpd_resp_sendstr_chunk(req,
+                             "<form action='/slow/'><input type='submit' value='SLOW'/></form>");
+    httpd_resp_sendstr_chunk(req,
+                             "<form action='/toggleserial/'><input type='submit' value='Toggle Serial'/></form>");
+    httpd_resp_sendstr_chunk(req,
+                             "<label>Serial:</label>");
+    if (uart_is_driver_installed(ECHO_UART_PORT_NUM))
+    {
         httpd_resp_sendstr_chunk(req,
-    "<form action='/power/'><input type='submit' value='TOGGLE POWER'/></form>");
+                                 "<input type='text' value='ON' disabled/>");
+    }
+    else
+    {
         httpd_resp_sendstr_chunk(req,
-    "<form action='/lid/'><input type='submit' value='TOGGLE LID'/></form>");
-        httpd_resp_sendstr_chunk(req,
-    "<form action='/fast/'><input type='submit' value='FAST'/></form>");
-        httpd_resp_sendstr_chunk(req,
-    "<form action='/slow/'><input type='submit' value='SLOW'/></form>");
+                                 "<input type='text' value='OFF' disabled/>");
+    }
 
     /* Send remaining chunk of HTML file to complete it */
     httpd_resp_sendstr_chunk(req, "</body></html>");
@@ -164,6 +181,12 @@ static esp_err_t download_get_handler(httpd_req_t *req)
     {
         Serial_Slow();
         ESP_LOGI(kLogPrefix, "Got slow request!\n");
+        return index_html_get_handler(req);
+    }
+    else if (strcmp(filename, "/toggleserial/") == 0)
+    {
+        Serial_Toggle();
+        ESP_LOGI(kLogPrefix, "Got toggle serial request!\n");
         return index_html_get_handler(req);
     }
     else if (filename[strlen(filename) - 1] == '/') // If name has trailing '/', respond with directory contents

@@ -3,6 +3,9 @@
 #include "tcp.h"
 
 #include <stdbool.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <sdkconfig.h>
 
 void Bridge_Task_Server(void *pvParameters)
 {
@@ -11,8 +14,16 @@ void Bridge_Task_Server(void *pvParameters)
 
     while (1)
     {
+        if(serial_enabled)
+        {
         Serial_ProcessEvents();
         TCP_ProcessEvents();
+        }
+        else
+        {
+            Serial_CheckToggle();
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+        }
     }
 
     TCP_Cleanup();

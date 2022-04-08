@@ -1,8 +1,10 @@
 #include "serial.h"
 
+#include "log.h"
 #include "tcp.h"
 
 #include <stdio.h>
+#include <esp_log.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "driver/uart.h"
@@ -32,6 +34,9 @@
 int uart_baud_rate = 115200;
 uint8_t serial_data[BUF_SIZE];
 
+volatile static bool serial_toggled = false;
+volatile bool serial_enabled = false;
+
 void Serial_Slow()
 {
     uart_baud_rate = 115200;
@@ -44,6 +49,32 @@ void Serial_Fast()
     vTaskDelay(500 / portTICK_PERIOD_MS);
     uart_baud_rate = 510000;
     uart_set_baudrate(ECHO_UART_PORT_NUM, uart_baud_rate);
+}
+
+void Serial_CheckToggle()
+{
+    if (serial_toggled)
+    {
+        serial_toggled = false;
+        if (serial_enabled)
+        {
+            ESP_LOGI(kLogPrefix, "Serial Deinit");
+            Serial_Deinit();
+        }
+        else
+        {
+            ESP_LOGI(kLogPrefix, "Serial Init");
+            Serial_Init();
+        }
+    }
+}
+
+void Serial_Deinit()
+{
+    uart_driver_delete(ECHO_UART_PORT_NUM);
+    gpio_set_direction(ECHO_TEST_RXD, GPIO_MODE_INPUT);
+    gpio_set_direction(ECHO_TEST_TXD, GPIO_MODE_INPUT);
+    serial_enabled = false;
 }
 
 void Serial_Init()
@@ -67,23 +98,37 @@ void Serial_Init()
     ESP_ERROR_CHECK(uart_driver_install(ECHO_UART_PORT_NUM, BUF_SIZE * 2, 0, 0, NULL, intr_alloc_flags));
     ESP_ERROR_CHECK(uart_param_config(ECHO_UART_PORT_NUM, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
+
+    serial_enabled = true;
+}
+
+void Serial_Toggle()
+{
+    serial_toggled = true;
 }
 
 void Serial_ProcessEvents()
 {
     // Read data from the UART
+    // Write data back to TCP
     int len = 0;
-    // Write data back to the UART
 
-    //Serial_SendData(len, (const char *)serial_data);
+    Serial_CheckToggle();
 
-    while ((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE,  1)) > 0)
+    if (serial_enabled)
     {
-        TCP_SendData(len, serial_data);
+
+        while (((len = uart_read_bytes(ECHO_UART_PORT_NUM, serial_data, BUF_SIZE, 1)) > 0) && serial_enabled)
+        {
+            TCP_SendData(len, serial_data);
+        }
     }
 }
 
 void Serial_SendData(int len, uint8_t *dataptr)
 {
-    uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
+    if (serial_enabled)
+    {
+        uart_write_bytes(ECHO_UART_PORT_NUM, dataptr, len);
+    }
 }
