@@ -13,7 +13,7 @@ void Init_Bridge()
     TCP_Init();
 }
 
-void Protocol_Bridge_Task_Server(void *pvParameters)
+void Raw_Bridge_Task_Server(void *pvParameters)
 {
     while (1)
     {
@@ -31,13 +31,3 @@ void Protocol_Bridge_Task_Server(void *pvParameters)
     TCP_Cleanup();
 }
 
-void Raw_Bridge_Task_Server(void *pvParameters)
-{
-    while (1)
-    {
-        Serial_ProcessEvents();
-        TCP_ProcessEvents();
-    }
-
-    TCP_Cleanup();
-}
