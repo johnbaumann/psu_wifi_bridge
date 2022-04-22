@@ -37,10 +37,12 @@ void Toggle_RTS()
 
 void Set_DTR(bool value)
 {
+    dtr_state = value;
     gpio_set_level(kPin_DTR, value);
 }
 
 void Set_RTS(bool value)
 {
+    rts_state = value;
     gpio_set_level(kPin_RTS, value);
 }

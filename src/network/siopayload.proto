@@ -10,8 +10,6 @@ message DataTransfer {
 }
 
 message SIOPayload {
-    oneof type {
-        DataTransfer data_transfer = 1;
-        FlowControl flow_control = 2;
-    }
+    DataTransfer data_transfer = 1;
+    FlowControl flow_control = 2;
 }

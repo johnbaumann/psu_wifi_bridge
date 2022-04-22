@@ -42,10 +42,10 @@ void Serial_Slow()
 
 void Serial_Fast()
 {
-    uart_write_bytes(ECHO_UART_PORT_NUM, "FAST", 5);
-    vTaskDelay(500 / portTICK_PERIOD_MS);
-    uart_baud_rate = 510000;
-    uart_set_baudrate(ECHO_UART_PORT_NUM, uart_baud_rate);
+    // uart_write_bytes(ECHO_UART_PORT_NUM, "FAST", 5);
+    // vTaskDelay(500 / portTICK_PERIOD_MS);
+    // uart_baud_rate = 510000;
+    // uart_set_baudrate(ECHO_UART_PORT_NUM, uart_baud_rate);
 }
 
 void Serial_Init()
@@ -67,7 +67,7 @@ void Serial_Init()
 
     ESP_ERROR_CHECK(uart_driver_install(ECHO_UART_PORT_NUM, BUF_SIZE * 2, 0, 0, NULL, intr_alloc_flags));
     ESP_ERROR_CHECK(uart_param_config(ECHO_UART_PORT_NUM, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, ECHO_TEST_RTS, ECHO_TEST_CTS));
+    ESP_ERROR_CHECK(uart_set_pin(ECHO_UART_PORT_NUM, ECHO_TEST_TXD, ECHO_TEST_RXD, NULL, NULL));
 }
 
 void Serial_ProcessEvents()
