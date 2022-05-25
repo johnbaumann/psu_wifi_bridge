@@ -128,7 +128,7 @@ static esp_err_t http_resp_dir_html(httpd_req_t *req, const char *dirpath)
                              "      <form action='/'>"
                              "          <table>"
                              "              <tr><th>Setting</th><th>Value</th></tr>"
-                             "              <tr><td>Baud</td><td><input type='number' id='baud' name='baud' min='1' max='2000000' value='");
+                             "              <tr><td>Baud</td><td><input type='number' id='baud' name='baud' min='1' max='2073600' value='");
 
     // Send baud rate
     sprintf(buffer, "%i", uart_config.baud_rate);

@@ -14,7 +14,6 @@
 #include "system/pins.h"
 #include "tty/serial.h"
 #include "tty/sio1.h"
-#include "network/client.h"
 #include <lwip/netdb.h>
 #include <driver/gpio.h>
 #include <esp_log.h>
@@ -29,18 +28,18 @@ extern "C"
 }
 void setup_pins()
 {
-    gpio_install_isr_service(0);
+    // gpio_install_isr_service(0);
 
     gpio_reset_pin(kPin_DSR);
     gpio_set_direction(kPin_DSR, GPIO_MODE_INPUT);
-    gpio_set_intr_type(kPin_DSR, GPIO_INTR_ANYEDGE);
-    gpio_isr_handler_add(kPin_DSR, Flow_InterruptHandler, NULL);
+    // gpio_set_intr_type(kPin_DSR, GPIO_INTR_ANYEDGE);
+    // gpio_isr_handler_add(kPin_DSR, Flow_InterruptHandler, NULL);
 
 
     gpio_reset_pin(kPin_CTS);
     gpio_set_direction(kPin_CTS, GPIO_MODE_INPUT);
-    gpio_set_intr_type(kPin_CTS, GPIO_INTR_ANYEDGE);
-    gpio_isr_handler_add(kPin_CTS, Flow_InterruptHandler, NULL);
+    // gpio_set_intr_type(kPin_CTS, GPIO_INTR_ANYEDGE);
+    // gpio_isr_handler_add(kPin_CTS, Flow_InterruptHandler, NULL);
   
 
     gpio_reset_pin(kPin_DTR);
@@ -66,10 +65,7 @@ void actual_main(void)
     Init_Bridge();
 
     // Serial and TCP repeater
-    xTaskCreate(Raw_Bridge_Task_Server, "tcp_serial_bridge", 1024 * 10, NULL, 1, NULL);
-
-    // TCP Client Task for Protobuf
-    xTaskCreate(tcp_client_task, "tcp_client", 4096, NULL, 0, NULL);
+    xTaskCreate(Raw_Bridge_Task_Server, "tcp_serial_bridge", 1024 * 20, NULL, 5, NULL);
 
     ESP_ERROR_CHECK(start_file_server("/"));
 

@@ -1,8 +1,8 @@
 #include "tcp.h"
 
 #include "system/log.h"
-#include "tty/serial.h"
 
+#include "bridge/bridge.h"
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <esp_intr_alloc.h>
@@ -27,6 +27,7 @@ int listen_sock = INVALID_SOCK;
 static int sock[1];
 int test_sock = INVALID_SOCK;
 int flags;
+bool connected = false;
 
 static void log_socket_error(const char *tag, const int sock, const int err, const char *message)
 {
@@ -47,6 +48,7 @@ static int try_receive(const char *tag, const int sock, uint8_t *data, size_t ma
         if (errno == ENOTCONN || errno == ECONNRESET)
         {
             ESP_LOGW(tag, "[sock=%d]: Connection closed", sock);
+            if (disable_uploads) connected = false;
             return -2; // Socket has been disconnected
         }
         if (errno == 58)
@@ -224,7 +226,7 @@ bool TCP_ProcessEvents()
             // We have a new client connected -> print it's address
             ESP_LOGI(kLogPrefix, "[sock=%d]: Connection accepted from IP:%s", sock[new_sock_index], get_clients_address(&source_addr));
             test_sock = sock[new_sock_index];
-
+            if (disable_uploads) connected = true;
             // ...and set the client's socket non-blocking
             flags = fcntl(sock[new_sock_index], F_GETFL);
             if (fcntl(sock[new_sock_index], F_SETFL, flags | O_NONBLOCK) == -1)
@@ -256,8 +258,14 @@ bool TCP_ProcessEvents()
             {
                 // Received some data -> echo back
                 //ESP_LOGI(kLogPrefix, "[sock=%d]: Received %.*s", sock[i], len, rx_buffer);
-
-                Serial_SendData(len, rx_buffer);
+                if (!disable_uploads) {
+                    Serial_SendData(len, rx_buffer);
+                } else {
+                    size_t received = cb_writebytes(&rxfifo, rx_buffer, len);
+                    // ESP_LOGI("TCP", "%d bytes written to rxfifo", received);
+                }
+                
+                
             }
 
         } // one client's socket

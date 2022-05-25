@@ -2,9 +2,7 @@ idf_component_register(
 	SRCS "main.cc"
          "bridge/bridge.cc"
          "network/file_server.cc"
-         "network/siopayload.pb.c"
          "network/tcp.cc"
-         "network/client.cc"
          "network/wifi_client.cc"
          "system/log.cc"
          "system/pins.cc"
@@ -13,5 +11,7 @@ idf_component_register(
          "nanopb/pb_common.c"
          "nanopb/pb_decode.c"
          "nanopb/pb_encode.c"
+         "nanopb/siopayload.pb.c"
+         "network/fifo.c"
     INCLUDE_DIRS .
     REQUIRES esp_http_server esp_wifi nvs_flash)

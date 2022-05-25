@@ -16,16 +16,10 @@ void Init_Bridge()
 void Raw_Bridge_Task_Server(void *pvParameters)
 {
     while (1)
-    {
-        if (!disable_uploads)
-        {
-            Serial_ProcessEvents();
-            TCP_ProcessEvents();
-        }
-        else
-        {
-            vTaskDelay(100 / portTICK_PERIOD_MS);
-        }
+    {   
+        Serial_ProcessEvents();
+        TCP_ProcessEvents();
+        Serial_StateMachine();
     }
 
     TCP_Cleanup();
